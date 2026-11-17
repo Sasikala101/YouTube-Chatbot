@@ -34,6 +34,17 @@ class AITests(unittest.TestCase):
             payload = post.call_args.kwargs['json']
             self.assertFalse(payload['store'])
             self.assertEqual(payload['system_instruction'], 'rules')
+            self.assertEqual(payload['generation_config']['thinking_level'], 'low')
+            self.assertLessEqual(post.call_args.kwargs['timeout'][1], 30)
+
+    def test_provider_timeout_returns_clear_failure_without_retry(self):
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}), patch(
+            'app.ai.requests.post', side_effect=ai.requests.Timeout
+        ) as post:
+            with self.assertRaises(HTTPException) as caught:
+                ai.generate('rules', 'question')
+            self.assertEqual(caught.exception.status_code, 504)
+            self.assertEqual(post.call_count, 1)
 
     def test_provider_quota_error(self):
         with patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}), patch('app.ai.requests.post', return_value=Mock(status_code=429)):
