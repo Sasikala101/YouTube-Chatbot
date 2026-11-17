@@ -3,6 +3,7 @@ let transcriptId = null;
 let revision = 0;
 let history = [];
 let summaryTimer;
+let retrievalTimer;
 let chatRevision = 0;
 
 async function api(path, body, timeout = 90000) {
@@ -103,6 +104,8 @@ $('video-form').addEventListener('submit', async (event) => {
   const currentRevision = revision;
   clearTimeout(summaryTimer);
   transcriptId = null;
+  clearTimeout(retrievalTimer);
+  $('retrieval-note').textContent = 'Preparing your video…';
   history = [];
   chatRevision += 1;
   $('question').disabled = true;
@@ -144,6 +147,7 @@ $('video-form').addEventListener('submit', async (event) => {
     loadMetadata(data, currentRevision);
     $('transcript-status').textContent = 'Video loaded. Your summary and chat are below.';
     requestSummary(currentRevision);
+    updateRetrieval(data.retrieval, currentRevision);
   } catch (error) {
     $('transcript-status').textContent = errorText(error);
     $('summary-status').textContent = 'Load a captioned video to generate a summary.';
@@ -153,7 +157,7 @@ $('video-form').addEventListener('submit', async (event) => {
   }
 });
 
-function appendMessage(role, text, sources = []) {
+function appendMessage(role, text, sources = [], method = null) {
   const message = document.createElement('article');
   message.className = `message ${role}`;
   const label = document.createElement('span');
@@ -165,6 +169,12 @@ function appendMessage(role, text, sources = []) {
   const content = document.createElement('p');
   content.textContent = text;
   bubble.append(content);
+  if (method) {
+    const mode = document.createElement('small');
+    mode.className = 'retrieval-mode';
+    mode.textContent = method === 'hybrid' ? 'Sources found by meaning + keywords' : 'Sources found by keywords (semantic search unavailable)';
+    bubble.append(mode);
+  }
   message.append(label, bubble);
   if (sources.length) {
     const details = document.createElement('details');
@@ -192,10 +202,19 @@ $('chat-form').addEventListener('submit', async (event) => {
   appendMessage('user', question);
   $('question').value = '';
   $('chat-status').textContent = 'Finding source passages and generating an answer…';
+  const startedAt = Date.now();
+  const chatTimer = setInterval(() => {
+    if (currentRevision !== revision || currentChat !== chatRevision) {
+      clearInterval(chatTimer);
+      return;
+    }
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    $('chat-status').textContent = `Generating your answer… ${elapsed}s elapsed.${elapsed >= 20 ? ' Gemini is responding slowly; please keep this page open.' : ''}`;
+  }, 1000);
   try {
     const data = await api('/api/chat', { transcript_id: transcriptId, question, history });
     if (currentRevision !== revision || currentChat !== chatRevision) return;
-    appendMessage('assistant', data.answer, data.sources);
+    appendMessage('assistant', data.answer, data.sources, data.retrieval_method);
     history = [...history, { role: 'user', content: question }, { role: 'assistant', content: data.answer.slice(0, 8000) }].slice(-8);
     $('chat-status').textContent = '';
   } catch (error) {
@@ -203,6 +222,7 @@ $('chat-form').addEventListener('submit', async (event) => {
     $('chat-status').textContent = errorText(error);
     $('question').value = question;
   } finally {
+    clearInterval(chatTimer);
     if (currentRevision === revision && currentChat === chatRevision) $('chat-button').disabled = false;
   }
 });
@@ -301,3 +321,23 @@ $('theme-toggle').addEventListener('click', () => {
   setTheme(dark);
   writeSaved('yt-dark', dark);
 });
+
+
+function updateRetrieval(state, currentRevision) {
+  if (currentRevision !== revision) return;
+  $('retrieval-note').textContent = state?.status === 'ready'
+    ? 'Search by meaning + keywords is ready.'
+    : state?.status === 'pending'
+      ? 'Preparing search by meaning. Keyword search is available now.'
+      : 'Keyword search active. Semantic search is unavailable for this session.';
+  if (state?.status === 'pending') {
+    retrievalTimer = setTimeout(async () => {
+      try {
+        const next = await api(`/api/retrieval-status/${transcriptId}`, undefined, 15000);
+        updateRetrieval(next, currentRevision);
+      } catch {
+        if (currentRevision === revision) $('retrieval-note').textContent = 'Could not check search readiness. Keyword fallback remains available.';
+      }
+    }, 2000);
+  }
+}

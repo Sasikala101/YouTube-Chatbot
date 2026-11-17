@@ -70,13 +70,13 @@
               <label class="sr-only" for="question">Your question</label>
               <div class="composer"><input id="question" type="text" required maxlength="1000" placeholder="Ask anything about this video…" disabled><button id="chat-button" type="submit" aria-label="Send question" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 7-7 7 7M12 5v15"/></svg></button></div>
             </form>
-            <p class="chat-note">Grounded in the video. Linked to the source.</p>
+            <p id="retrieval-note" class="chat-note" role="status">Grounded in the video. Linked to the source.</p>
           </div>
         </section>
       </div>
     </div>
     <section id="history-view" class="card secondary-view" hidden><h1>Your video history</h1><p class="muted">Recently loaded videos on this browser. Select a video to load it again.</p><div id="history-list"></div><p class="muted">Video links are saved locally. Conversations and summaries are not saved.</p></section>
-    <section id="about-view" class="card secondary-view" hidden><span class="eyebrow">WATCH. ASK. LEARN.</span><h1>More understanding.<br>Less rewinding.</h1><p>Load a public YouTube video with English captions, read its AI summary, and ask questions grounded in the transcript. Open the source timestamps to explore an idea in context.</p><h2>How it works</h2><p>We retrieve captions, split them into overlapping passages, and find passages matching your question. Gemini uses those passages to generate an answer. Current retrieval uses keywords, so specific terms from the video work best.</p><h2>Your data</h2><p>The transcript and your questions are sent to Google for AI generation. Recent video links stay in your browser. Server sessions expire after an hour or a restart.</p></section>
+    <section id="about-view" class="card secondary-view" hidden><span class="eyebrow">WATCH. ASK. LEARN.</span><h1>More understanding.<br>Less rewinding.</h1><p>Load a public YouTube video with English captions, read its AI summary, and ask questions grounded in the transcript. Open the source timestamps to explore an idea in context.</p><h2>How it works</h2><p>We retrieve captions, split them into overlapping passages, and find passages matching your question. Gemini uses those passages to generate an answer. Search combines meaning-based embeddings with keywords, falling back to keywords if embeddings are unavailable.</p><h2>Your data</h2><p>The transcript and your questions are sent to Google for embeddings and AI generation. Recent video links stay in your browser. Server sessions expire after an hour or a restart.</p></section>
     <footer><span>Built for curious minds.</span><div><span id="status" role="status">Connecting…</span><button id="check" class="footer-button">Reconnect</button><a href="/docs">API docs ↗</a></div></footer>
   </main>
 </body>
