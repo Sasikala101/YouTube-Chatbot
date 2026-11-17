@@ -16,20 +16,22 @@ Ask questions about a YouTube video, read an AI summary, and explore the timesta
 ## How it works
 
 ```text
-YouTube link → timed captions → overlapping chunks → TF-IDF retrieval
+YouTube link → timed captions → overlapping chunks → hybrid semantic + keyword retrieval
                                                         ↓
 Question + recent conversation + source passages → Gemini → answer + sources
 
 Full transcript → section summaries when needed → video summary
 ```
 
-The current retrieval baseline uses TF-IDF and cosine similarity, not neural embeddings. Captions are split into 140-word chunks with a 30-word overlap. Chat uses up to five matching chunks and the most recent eight conversation messages. A question without matching passages receives a no-match response instead of making an AI request.
+Retrieval combines Gemini `gemini-embedding-001` semantic embeddings with TF-IDF keyword matches. Captions are split into 140-word chunks with a 30-word overlap. Each chunk receives a normalized 768-dimensional document vector through the embedding API; questions use the corresponding query task. Cosine similarity ranks semantic candidates, and reciprocal-rank fusion combines semantic and keyword rankings. Chat uses up to five retrieved chunks and the most recent eight conversation messages.
 
-Gemini is instructed to answer only from the supplied evidence. Generated content can still contain errors; inspect the linked transcript sources. Visual-only information is not analyzed. Semantic embeddings, transcript-provider fallbacks, and durable storage are planned improvements.
+Document embeddings are prepared in background batches of up to 32 chunks. The app uses keyword retrieval while indexing is pending, or if indexing or query embedding fails. The UI identifies the retrieval mode instead of silently claiming semantic search succeeded. Vectors and up to 64 question embeddings are cached in each in-memory video session. No local neural model download or extra dependency is required.
+
+Gemini is instructed to answer only from the supplied evidence. Generated content can still contain errors; inspect the linked transcript sources. Visual-only information is not analyzed. Transcript-provider fallbacks and durable storage are planned improvements. Semantic rankings and the minimum similarity cutoff are heuristics, not guarantees of relevance; the answer model must still judge whether the passages support an answer.
 
 ## Stack
 
-Python 3.12 · FastAPI · Gemini Interactions API · youtube-transcript-api · HTML · CSS · JavaScript
+Python 3.12 · FastAPI · RAG · Gemini generation and embeddings APIs · TF-IDF · HTML · CSS · JavaScript
 
 The frontend and API share one server. API keys remain on the backend.
 
@@ -79,9 +81,21 @@ Tests cover URL validation, chunk overlap, timestamps, ranking, no-match behavio
 
 - `app/main.py`: HTTP routes and background summary jobs.
 - `app/transcripts.py`: YouTube URL parsing and timed caption retrieval.
-- `app/retrieval.py`: chunking, TF-IDF ranking, and temporary index storage.
+- `app/retrieval.py`: chunking, hybrid ranking, and temporary index storage.
+- `app/embeddings.py`: batched document/query embeddings, normalization, and safe provider errors.
 - `app/ai.py`: backend Gemini requests and provider error handling.
 - `app/static/`: responsive video, summary, and chat interface.
-- `tests/`: backend unit tests.
+- `tests/`: backend unit tests, including embedding validation and fallback behavior.
 - `requirements.lock`: exact installed dependencies used for deployment.
 - `render.yaml`: Render service configuration, without credentials.
+
+### AI response timing
+
+Generation requests use low reasoning effort and an output cap to suit interactive video summaries and chat. Each provider attempt has a 5-second connect timeout and 30-second read-idle timeout; transient HTTP server errors receive at most one retry. These are network idle timeouts, not guaranteed total wall-clock deadlines. Chat shows elapsed time while waiting. Provider availability and quotas can still prevent a response.
+
+
+### Semantic retrieval validation
+
+The unit suite includes a paraphrase with no meaningful keyword overlap (`pay rise` versus `Compensation doubled after joining Amazon`) and verifies semantic retrieval, timestamp preservation, query caching, malformed vectors, dimension mismatches, and provider failure fallback. A live check embedded the 15 chunks of the example career interview and ran three paraphrased questions through both retrieval methods. This is a smoke comparison, not a general accuracy benchmark; hybrid search does not improve every question.
+
+`GEMINI_EMBEDDING_MODEL` defaults to `gemini-embedding-001`, whose document/query task types are supported by this implementation. Changing embedding models requires reloading videos so document and query vectors stay in the same vector space. Embedding calls consume the provider's separate embedding quota and may incur costs under its plan. The `/api/retrieval-status/{transcript_id}` endpoint reports readiness; chat and `/api/search` report the method used for each result.
