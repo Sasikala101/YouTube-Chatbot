@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1b3b">
+  <title>YouTube Chatbot</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#home" aria-label="YouTube Chatbot home">
+      <span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 32 24"><rect width="32" height="24" rx="7" fill="currentColor"/><path d="m13 6 10 6-10 6z" fill="white"/></svg></span>
+      <span><strong>YouTube Chatbot</strong><small>Watch. Ask. Learn smarter.</small></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <button class="nav-button active" data-view="home" aria-current="page">Home</button>
+      <button class="nav-button" data-view="history">History</button>
+      <button class="nav-button" data-view="about">About</button>
+    </nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Switch to dark theme" title="Switch theme">☾</button>
+  </header>
+  <main>
+    <div id="home-view">
+      <section class="card load-card" aria-label="Load a video">
+        <form id="video-form">
+          <label for="video-url">YouTube video link</label>
+          <div class="load-row">
+            <input id="video-url" name="url" type="url" required maxlength="2048" placeholder="https://www.youtube.com/watch?v=…">
+            <span class="language-pill" title="English captions are supported in this version">English <span aria-hidden="true">⌄</span></span>
+            <button id="load" type="submit">Load Video</button>
+          </div>
+        </form>
+        <p id="transcript-status" class="status-line" role="status" aria-live="polite"></p>
+      </section>
+      <div class="workspace">
+        <div class="video-column">
+          <section class="card video-card" aria-label="Video player">
+            <div id="video-placeholder" class="video-placeholder">
+              <span class="placeholder-play" aria-hidden="true">▶</span>
+              <h1>Your next rabbit hole,<br>made a little smarter.</h1>
+              <p>Load a video. Get the key ideas. Ask away.</p>
+            </div>
+            <iframe id="video-player" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen hidden></iframe>
+            <div class="video-info">
+              <span class="video-info-icon" aria-hidden="true">▶</span>
+              <div><h2 id="video-title">A better way to learn from videos</h2><p id="video-byline">Your video and its sources, all in one place.</p></div>
+              <a id="watch-video" class="text-link" target="_blank" rel="noopener noreferrer" hidden>Watch ↗</a>
+            </div>
+          </section>
+          <section id="summary-panel" class="card" aria-labelledby="summary-title">
+            <div class="section-heading"><h2 id="summary-title"><span class="sparkle" aria-hidden="true">✧</span> AI Summary</h2><span class="tag">KEY TAKEAWAYS</span></div>
+            <p id="summary-status" class="muted" role="status" aria-live="polite">The big picture, without the replay. Your summary will appear here after you load a video.</p>
+            <div id="summary-text" class="generated-text"></div>
+            <button id="summary-retry" class="secondary" type="button" hidden>Retry summary</button>
+          </section>
+          <section id="transcript-panel" class="card transcript-card" aria-labelledby="transcript-title" hidden>
+            <h2 id="transcript-title">Video transcript</h2>
+            <p id="transcript-meta" class="muted"></p>
+            <details><summary>View timestamped transcript</summary><div id="segments"></div></details>
+          </section>
+        </div>
+        <section id="chat-panel" class="card chat-card" aria-labelledby="chat-title">
+          <div class="section-heading"><h2 id="chat-title">Ask the Video</h2><button id="clear-chat" class="secondary" type="button">Clear Chat</button></div>
+          <div id="chat-messages" role="log" aria-label="Video conversation" aria-live="polite"></div>
+          <div class="chat-bottom">
+            <p id="chat-status" class="status-line" role="status" aria-live="polite"></p>
+            <form id="chat-form">
+              <label class="sr-only" for="question">Your question</label>
+              <div class="composer"><input id="question" type="text" required maxlength="1000" placeholder="Ask anything about this video…" disabled><button id="chat-button" type="submit" aria-label="Send question" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 7-7 7 7M12 5v15"/></svg></button></div>
+            </form>
+            <p class="chat-note">Grounded in the video. Linked to the source.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+    <section id="history-view" class="card secondary-view" hidden><h1>Your video history</h1><p class="muted">Recently loaded videos on this browser. Select a video to load it again.</p><div id="history-list"></div><p class="muted">Video links are saved locally. Conversations and summaries are not saved.</p></section>
+    <section id="about-view" class="card secondary-view" hidden><span class="eyebrow">WATCH. ASK. LEARN.</span><h1>More understanding.<br>Less rewinding.</h1><p>Load a public YouTube video with English captions, read its AI summary, and ask questions grounded in the transcript. Open the source timestamps to explore an idea in context.</p><h2>How it works</h2><p>We retrieve captions, split them into overlapping passages, and find passages matching your question. Gemini uses those passages to generate an answer. Current retrieval uses keywords, so specific terms from the video work best.</p><h2>Your data</h2><p>The transcript and your questions are sent to Google for AI generation. Recent video links stay in your browser. Server sessions expire after an hour or a restart.</p></section>
+    <footer><span>Built for curious minds.</span><div><span id="status" role="status">Connecting…</span><button id="check" class="footer-button">Reconnect</button><a href="/docs">API docs ↗</a></div></footer>
+  </main>
+</body>
+</html>
