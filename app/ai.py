@@ -19,12 +19,15 @@ def generate(instructions, prompt):
         response = None
         for attempt in range(2):
             response = requests.post(
-            "https://generativelanguage.googleapis.com/v1beta/interactions",
-            headers={"x-goog-api-key": key, "Api-Revision": "2026-05-20"},
-            json={"model": os.getenv("GEMINI_MODEL", "gemini-4-hydrogen"),
-                  "store": False, "system_instruction": instructions,
-                  "input": prompt},
-            timeout=(5, 75),
+                "https://generativelanguage.googleapis.com/v1beta/interactions",
+                headers={"x-goog-api-key": key, "Api-Revision": "2026-05-20"},
+                json={"model": os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+                      "store": False, "system_instruction": instructions,
+                      "input": prompt,
+                      "generation_config": {"thinking_level": "low", "max_output_tokens": 4096}},
+                # Two attempts fit inside the browser's 90-second wait under
+                # normal request timing. Requests' read timeout is an idle limit.
+                timeout=(5, 30),
             )
             if response.status_code not in {500, 502, 503, 504} or attempt == 1:
                 break

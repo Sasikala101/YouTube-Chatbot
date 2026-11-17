@@ -66,7 +66,7 @@ class TranscriptRequest(BaseModel):
 
 
 @app.post("/api/transcript", tags=["Videos"])
-def transcript(request: TranscriptRequest):
+def transcript(request: TranscriptRequest, background_tasks: BackgroundTasks = None):
     try:
         video_id = extract_video_id(request.url)
     except ValueError as exc:
@@ -95,6 +95,10 @@ def transcript(request: TranscriptRequest):
         raise HTTPException(404, "The transcript has no searchable text. Try another video.")
     result["transcript_id"] = indexes.add(index)
     result["chunk_count"] = len(index.chunks)
+    if background_tasks is not None and ai.configured():
+        index.semantic_status = "pending"
+        background_tasks.add_task(index.prepare_semantic)
+    result["retrieval"] = index.retrieval_state()
     return result
 
 
@@ -110,8 +114,8 @@ def search(request: SearchRequest):
     index = indexes.get(request.transcript_id)
     if index is None:
         raise HTTPException(404, "This transcript session has expired. Load the video again.")
-    passages = index.search(request.question)
-    return {"method": "tf-idf", "passages": passages, "chunk_count": len(index.chunks)}
+    passages, method, notice = index.retrieve(request.question, limit=3)
+    return {"method": method, "notice": notice, "passages": passages, "chunk_count": len(index.chunks)}
 
 
 class VideoSessionRequest(BaseModel):
@@ -123,6 +127,11 @@ def get_index(transcript_id):
     if index is None:
         raise HTTPException(404, "This video session has expired. Load the video again.")
     return index
+
+
+@app.get("/api/retrieval-status/{transcript_id}", tags=["Retrieval"])
+def retrieval_status(transcript_id: str):
+    return get_index(transcript_id).retrieval_state()
 
 
 def generate_summary(index):
@@ -220,13 +229,14 @@ def chat(request: ChatRequest):
     if len(tokenize(query)) < 4:
         previous = [turn.content for turn in request.history if turn.role == "user"]
         query = " ".join(previous[-2:] + [query])
-    passages = index.search(query, limit=5)
+    passages, method, notice = index.retrieve(query, limit=5)
     if not passages:
-        return {"answer": "I couldn't find matching passages in this video's transcript. Try using a specific term from the video.", "sources": []}
+        return {"answer": "I couldn't find relevant passages in this video's transcript. Try rephrasing your question.", "sources": [], "retrieval_method": method, "retrieval_notice": notice}
     evidence = [{"id": number + 1, "text": passage["text"]} for number, passage in enumerate(passages)]
     answer = ai.generate(ai.GROUNDING, json.dumps({
         "question": request.question,
         "history": [turn.model_dump() for turn in request.history],
         "video_passages": evidence,
     }))
-    return {"answer": answer, "sources": [{"id": number + 1, **passage} for number, passage in enumerate(passages)]}
+    return {"answer": answer, "sources": [{"id": number + 1, **passage} for number, passage in enumerate(passages)],
+            "retrieval_method": method, "retrieval_notice": notice}
